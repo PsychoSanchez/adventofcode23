@@ -49,8 +49,12 @@ async function main1() {
   const stream = Bun.file("./data/day-1.data").stream();
 
   let sum = 0;
+  let tail = "";
+  const decoder = new TextDecoder();
   for await (const chunk of stream) {
-    const lines = new TextDecoder().decode(chunk).split("\n");
+    const lines = (tail + decoder.decode(chunk)).split("\n");
+    tail = lines.pop() ?? "";
+
     for (const line of lines) {
       sum += findTwoDigitNumberFromString(line);
     }
@@ -152,11 +156,15 @@ function findTwoDigitNumberFromStringWithLetters(line: string): number {
 }
 
 async function main2() {
-  const stream = Bun.file("./data/day-1.data").stream();
+  const stream = Bun.file("./data/day-1.data").stream(0.1);
 
   let sum = 0;
+  let tail = "";
+  const decoder = new TextDecoder();
   for await (const chunk of stream) {
-    const lines = new TextDecoder().decode(chunk).split("\n");
+    const lines = (tail + decoder.decode(chunk)).split("\n");
+    tail = lines.pop() ?? "";
+
     for (const line of lines) {
       sum += findTwoDigitNumberFromStringWithLetters(line);
     }
