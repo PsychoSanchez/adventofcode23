@@ -154,24 +154,19 @@ console.log(`The sum of possible game IDs is ${await main1()}`);
 // For each game, find the minimum set of cubes that must have been present. What is the sum of the power of these sets?
 
 async function main2() {
-  function findMax(game: Game, color: CubeType) {
-    const rounds = game.sets.flatMap((set) => {
-      return set.rounds
-        .filter((round) => round.color === color)
-        .map((round) => round.count);
-    });
-
-    return Math.max(...rounds);
-  }
-
   const input = await readInput();
 
   const sum = input.reduce((acc, game) => {
-    const [r, g, b] = [
-      findMax(game, CubeType.Red),
-      findMax(game, CubeType.Green),
-      findMax(game, CubeType.Blue),
-    ];
+    const [r, g, b] = game.sets.reduce(
+      (acc, set) => {
+        set.rounds.forEach((round) => {
+          acc[round.color] = Math.max(acc[round.color], round.count);
+        });
+
+        return acc;
+      },
+      [1, 1, 1],
+    );
 
     return acc + r * g * b;
   }, 0);
