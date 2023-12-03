@@ -2,6 +2,7 @@
 // You and the Elf eventually reach a gondola lift station; he says the gondola lift will take you up to the water source, but this is as far as he can bring you. You go inside.
 
 import { assert } from "./shared/assert";
+import { range } from "./shared/utils";
 
 // It doesn't take long to find the gondolas, but there seems to be a problem: they're not moving.
 
@@ -40,9 +41,6 @@ const isDot = (char: string) => char === ".";
 const isStar = (char: string) => char === "*";
 const isNumber = (char: string) => !isNaN(parseInt(char));
 const isSymbol = (char: string) => !isDot(char) && !isNumber(char);
-const range = (start: number, end: number) =>
-  // inclusive
-  Array.from({ length: end - start + 1 }, (_, i) => i + start);
 
 // 539590
 // 80703636
@@ -61,15 +59,11 @@ async function processInput() {
   // .664.598..`;
 
   const lines = input.split("\n");
-  const stars: Array<Array<number>> = Array.from(
-    { length: lines.length },
-    () => [],
-  );
-  const numbers = lines.map((line, lineIndex) => {
+  const numbers = lines.map((line) => {
     const result: Array<NumberValue> = [];
 
     let temp = "";
-    let indexStart = null;
+    let indexStart: null | number = null;
 
     for (let i = 0; i < line.length; i++) {
       const char = line[i]!;
@@ -79,10 +73,6 @@ async function processInput() {
         indexStart ??= i;
         temp += num;
         continue;
-      }
-
-      if (isStar(char)) {
-        stars[lineIndex]!.push(i);
       }
 
       if (temp) {
@@ -111,7 +101,6 @@ async function processInput() {
   return {
     lines,
     numbers,
-    stars,
   };
 }
 
@@ -189,7 +178,7 @@ assert(main1Result === 539590, "main1Result === 539590");
 // What is the sum of all of the gear ratios in your engine schematic?
 
 async function main2() {
-  const { numbers, lines, stars } = await processInput();
+  const { numbers, lines } = await processInput();
   const adjacentNumbers = filterNumbersWithAdjacentSymbol(
     lines,
     numbers,
@@ -206,18 +195,28 @@ async function main2() {
 
   for (const num of adjacentNumbers) {
     const { rowIndex, colIndexEnd, colIndexStart, value } = num;
-    const starsToCompareAgainst = range(rowIndex - 1, rowIndex + 1).flatMap(
-      (starRowIndex) =>
-        (stars[starRowIndex] ?? []).map((i) => [starRowIndex, i] as const),
+
+    // All possible adjacent stars
+    const starScanRange: Array<readonly [col: number, row: number]> = [
+      // left and right
+      [colIndexStart - 1, rowIndex],
+      [colIndexEnd + 1, rowIndex],
+      // top
+      ...range(colIndexStart - 1, colIndexEnd + 1).map(
+        (col) => [col, rowIndex - 1] as const,
+      ),
+      // bottom
+      ...range(colIndexStart - 1, colIndexEnd + 1).map(
+        (col) => [col, rowIndex + 1] as const,
+      ),
+    ];
+
+    const adjacentStars = starScanRange.filter(([col, row]) =>
+      isStar(lines[row]?.[col] ?? "."),
     );
 
-    const adjacentStars = starsToCompareAgainst.filter(
-      ([_, starColIndex]) =>
-        colIndexStart - 1 <= starColIndex && colIndexEnd + 1 >= starColIndex,
-    );
-
-    for (const [starRowIndex, starColIndex] of adjacentStars) {
-      const key = `${starColIndex}-${starRowIndex}`;
+    for (const [col, row] of adjacentStars) {
+      const key = `${col}-${row}`;
       const cache = starAdjacentNumberMap.get(key) ?? [];
       cache.push(value);
       starAdjacentNumberMap.set(key, cache);
