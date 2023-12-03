@@ -27,8 +27,8 @@ function findTwoDigitNumberFromString(line: string): number {
     right = line.length;
 
   while (left <= right) {
-    const leftDigit = parseInt(line[left]);
-    const rightDigit = parseInt(line[right]);
+    const leftDigit = parseInt(line[left]!);
+    const rightDigit = parseInt(line[right]!);
 
     const isLeftDigitFound = !isNaN(leftDigit);
     const isRightDigitFound = !isNaN(rightDigit);
@@ -116,7 +116,7 @@ function findTwoDigitNumberFromStringWithLetters(line: string): number {
 
   const findDigit = (index: number) => {
     const symbl = line[index];
-    const numericDigit = parseInt(symbl);
+    const numericDigit = parseInt(symbl!);
     const isDigit = !isNaN(numericDigit);
 
     if (isDigit) {

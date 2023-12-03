@@ -67,15 +67,15 @@ const readInput = async () => {
   const data = text.split("\n").map((line) => {
     const [id, game] = line.split(": ");
 
-    const sets = game.split("; ").map((set) => {
+    const sets = game!.split("; ").map((set) => {
       const cubes = set.split(", ");
 
       const rounds = cubes.map((cube) => {
         const [count, color] = cube.split(" ");
 
         return {
-          count: unsafeParseInt(count),
-          color: colorStringToEnum(color),
+          count: unsafeParseInt(count!),
+          color: colorStringToEnum(color!),
         };
       });
 
@@ -83,7 +83,7 @@ const readInput = async () => {
     });
 
     return {
-      id: unsafeParseInt(id.split(" ")[1]),
+      id: unsafeParseInt(id!.split(" ")[1]!),
       sets,
     };
   });
