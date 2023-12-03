@@ -1,6 +1,8 @@
 // --- Day 3: Gear Ratios ---
 // You and the Elf eventually reach a gondola lift station; he says the gondola lift will take you up to the water source, but this is as far as he can bring you. You go inside.
 
+import { assert } from "./shared/assert";
+
 // It doesn't take long to find the gondolas, but there seems to be a problem: they're not moving.
 
 // "Aaah!"
@@ -27,11 +29,23 @@
 
 // Of course, the actual engine schematic is much larger. What is the sum of all of the part numbers in the engine schematic?
 
-type LineNumbers = {
+type NumberValue = {
   num: number;
   indexStart: number;
   indexEnd: number;
-}[][];
+};
+type NumbersMatrix = Array<Array<NumberValue>>;
+
+const isDot = (char: string) => char === ".";
+const isStar = (char: string) => char === "*";
+const isNumber = (char: string) => !isNaN(parseInt(char));
+const isSymbol = (char: string) => !isDot(char) && !isNumber(char);
+const range = (start: number, end: number) =>
+  // inclusive
+  Array.from({ length: end - start + 1 }, (_, i) => i + start);
+
+// 539590
+// 80703636
 
 async function processInput() {
   const input = await Bun.file("./data/day-3.data").text();
@@ -51,12 +65,8 @@ async function processInput() {
     { length: lines.length },
     () => [],
   );
-  const lineNumbers = lines.map((line, lineIndex) => {
-    const result: Array<{
-      num: number;
-      indexStart: number;
-      indexEnd: number;
-    }> = [];
+  const numbers = lines.map((line, lineIndex) => {
+    const result: Array<NumberValue> = [];
 
     let temp = "";
     let indexStart = null;
@@ -71,7 +81,7 @@ async function processInput() {
         continue;
       }
 
-      if (char === "*") {
+      if (isStar(char)) {
         stars[lineIndex]!.push(i);
       }
 
@@ -100,17 +110,16 @@ async function processInput() {
 
   return {
     lines,
-    lineNumbers,
+    numbers,
     stars,
   };
 }
 
-const DOT_OR_NUMBER = /[0-9.]/;
 function filterNumbersWithAdjacentSymbol(
   lines: string[],
-  lineNumbers: LineNumbers,
+  numbersMatrix: NumbersMatrix,
 ) {
-  return lineNumbers.map((numbers, rowIndex) =>
+  return numbersMatrix.map((numbers, rowIndex) =>
     numbers.filter((number) => {
       const { indexStart, indexEnd } = number;
       const previousRow = lines[rowIndex - 1];
@@ -119,41 +128,38 @@ function filterNumbersWithAdjacentSymbol(
       const previousChar = lines[rowIndex]![indexStart - 1] ?? ".";
       const nextChar = lines[rowIndex]![indexEnd + 1] ?? ".";
 
-      if (!DOT_OR_NUMBER.test(previousChar) || !DOT_OR_NUMBER.test(nextChar)) {
+      if (isSymbol(previousChar) || isSymbol(nextChar)) {
         return true;
       }
 
-      for (
-        let i = Math.max(indexStart - 1, 0);
-        i <= Math.min(indexEnd + 1, lines[rowIndex]!.length);
-        i++
-      ) {
+      const lineLength = lines[rowIndex]!.length;
+      return range(
+        Math.max(0, indexStart - 1),
+        Math.min(indexEnd + 1, lineLength),
+      ).some((i) => {
         const previousRowChar = previousRow?.[i] ?? ".";
         const nextRowChar = nextRow?.[i] ?? ".";
 
-        if (
-          !DOT_OR_NUMBER.test(previousRowChar) ||
-          !DOT_OR_NUMBER.test(nextRowChar)
-        ) {
-          return true;
-        }
-      }
-
-      return false;
+        return isSymbol(previousRowChar) || isSymbol(nextRowChar);
+      });
     }),
   );
 }
-async function main1() {
-  const { lineNumbers, lines } = await processInput();
 
-  const sum = filterNumbersWithAdjacentSymbol(lines, lineNumbers)
+async function main1() {
+  const { numbers, lines } = await processInput();
+
+  const sum = filterNumbersWithAdjacentSymbol(lines, numbers)
     .flat()
     .reduce((acc, { num }) => acc + num, 0);
 
   return sum;
 }
 
-console.log(`The sum of all part numbers is ${await main1()}`);
+const main1Result = await main1();
+
+console.log(`The sum of all part numbers is ${main1Result}`);
+assert(main1Result === 539590, "main1Result === 539590");
 
 // --- Part Two ---
 // The engineer finds the missing part and installs it in the engine! As the engine springs to life, you jump in the closest gondola, finally ready to ascend to the water source.
@@ -183,55 +189,49 @@ console.log(`The sum of all part numbers is ${await main1()}`);
 // What is the sum of all of the gear ratios in your engine schematic?
 
 async function main2() {
-  const { lineNumbers, lines, stars } = await processInput();
-  console.log(stars);
-  const filteredNumbers = filterNumbersWithAdjacentSymbol(lines, lineNumbers);
+  const { numbers, lines, stars } = await processInput();
+  const adjacentNumbers = filterNumbersWithAdjacentSymbol(
+    lines,
+    numbers,
+  ).flatMap((numbers, rowIndex) =>
+    numbers.map((number) => ({
+      rowIndex,
+      colIndexStart: number.indexStart,
+      colIndexEnd: number.indexEnd,
+      value: number.num,
+    })),
+  );
 
-  let sum = 0;
-  const starAdjacentNumberMap = new Map<string, number>();
-  filteredNumbers.flatMap((numbers, rowIndex) => {
-    return numbers.filter((number) => {
-      const starRowIndexes = [rowIndex - 1, rowIndex, rowIndex + 1];
-      for (const starRowIndex of starRowIndexes) {
-        const starRow = stars[starRowIndex] ?? [];
+  const starAdjacentNumberMap = new Map<string, number[]>();
 
-        for (const starColIndex of starRow) {
-          // *****
-          // *465*
-          // *****
-          const isAdjacent =
-            number.indexStart - 1 <= starColIndex &&
-            number.indexEnd + 1 >= starColIndex;
+  for (const num of adjacentNumbers) {
+    const { rowIndex, colIndexEnd, colIndexStart, value } = num;
+    const starsToCompareAgainst = range(rowIndex - 1, rowIndex + 1).flatMap(
+      (starRowIndex) =>
+        (stars[starRowIndex] ?? []).map((i) => [starRowIndex, i] as const),
+    );
 
-          if (isAdjacent) {
-            const key = `${starColIndex}-${starRowIndex}`;
-            const value = starAdjacentNumberMap.get(key);
-            if (!value) {
-              starAdjacentNumberMap.set(key, number.num);
-              return false;
-            } else {
-              const multiplied = value * number.num;
-              sum += multiplied;
-              starAdjacentNumberMap.set(key, multiplied);
+    const adjacentStars = starsToCompareAgainst.filter(
+      ([_, starColIndex]) =>
+        colIndexStart - 1 <= starColIndex && colIndexEnd + 1 >= starColIndex,
+    );
 
-              return false;
-            }
-          }
-        }
-      }
+    for (const [starRowIndex, starColIndex] of adjacentStars) {
+      const key = `${starColIndex}-${starRowIndex}`;
+      const cache = starAdjacentNumberMap.get(key) ?? [];
+      cache.push(value);
+      starAdjacentNumberMap.set(key, cache);
+    }
+  }
 
-      return true;
-    });
-  });
-
-  //   const sumOfNumbers = numbersToSum.reduce((acc, { num }) => acc + num, 0);
-  //   console.log(starAdjacentNumberMap);
-  //   const sumOfStars = Array.from(starAdjacentNumberMap.values()).reduce(
-  //     (acc, value) => acc + value,
-  //     0,
-  //   );
+  const sum = Array.from(starAdjacentNumberMap.values())
+    .filter((v) => v.length === 2)
+    .reduce((acc, [a, b]) => acc + a! * b!, 0);
 
   return sum;
 }
 
-console.log(`The sum of all gear ratios is ${await main2()}`);
+const main2Result = await main2();
+// 80703636
+console.log(`The sum of all gear ratios is ${main2Result}`);
+assert(main2Result === 80703636, "main2Result === 80703636");
