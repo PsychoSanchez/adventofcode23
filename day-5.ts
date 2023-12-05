@@ -135,41 +135,46 @@ function openDataFile() {
 }
 
 function processInput(input: string) {
-  const lines = input.split("\n\n");
+  const [seedsStr, ...mapsStr] = input.split("\n\n");
 
-  const maps = new Map<
-    string,
-    { to: string; ranges: Array<{ from: number; to: number; len: number }> }
-    // Map<string, Array<{ from: number; to: number; len: number }>>
-  >();
-  let seeds: Array<number> = [];
-  for (const line of lines) {
-    if (line.startsWith("seeds: ")) {
-      seeds = line
-        .slice(7)
-        .split(" ")
-        .map((seed) => unsafeParseInt(seed));
-    } else if (line.includes("map:\n")) {
-      const [mapTitle, ...ranges] = line.split("\n");
-      const indexOfSpace = mapTitle!.indexOf(" ");
-      const indexOfMiddle = mapTitle!.indexOf("-to-");
-      const fromMap = mapTitle!.slice(0, indexOfMiddle);
-      const toMap = mapTitle!.slice(indexOfMiddle + 4, indexOfSpace);
+  assert(seedsStr);
+  assert(seedsStr.startsWith("seeds: "), "Seeds should start with 'seeds: '");
 
-      const map = maps.get(fromMap) ?? { to: toMap, ranges: [] }; // new Map<string, Array<{ from: number; to: number; len: number }>>();
-      const range: Array<{ from: number; to: number; len: number }> = [];
+  const seeds: Array<number> = seedsStr
+    .slice(7)
+    .split(" ")
+    .map((seed) => unsafeParseInt(seed));
 
-      for (const rangeStr of ranges) {
-        const [to, from, len] = rangeStr
-          .split(" ")
-          .map((num) => unsafeParseInt(num)) as [number, number, number];
-        range.push({ from, to, len });
-      }
+  const maps = new Map(
+    mapsStr.map((line) => {
+      assert(line.includes(" map:\n"));
 
-      map.ranges = range.sort((a, b) => a.from - b.from);
-      maps.set(fromMap, map);
-    }
-  }
+      const [mapTitle, ...rangeStr] = line.split("\n");
+      assert(mapTitle);
+
+      const indexOfSpace = mapTitle.indexOf(" ");
+      const indexOfMiddle = mapTitle.indexOf("-to-");
+      const fromMap = mapTitle.slice(0, indexOfMiddle);
+      const toMap = mapTitle.slice(indexOfMiddle + 4, indexOfSpace);
+
+      const ranges = rangeStr
+        .map((rangeStr) => {
+          const [to, from, len] = rangeStr
+            .split(" ")
+            .map((num) => unsafeParseInt(num));
+
+          assert(
+            from !== undefined && to !== undefined && len !== undefined,
+            "Range should have 3 numbers",
+          );
+
+          return { from, to, len };
+        })
+        .sort((a, b) => a.from - b.from);
+
+      return [fromMap, { to: toMap, ranges }] as const;
+    }),
+  );
 
   return {
     maps,
@@ -226,6 +231,7 @@ async function main1() {
 
 // 278755257
 console.log(`The lowest location number is ${await main1()}`);
+assert((await main1()) === 278755257);
 
 // --- Part Two ---
 // Everyone will starve if you only plant such a small number of seeds. Re-reading the almanac, it looks like the seeds: line actually describes ranges of seed numbers.
@@ -254,97 +260,84 @@ async function main2() {
   });
 
   const min = seedRanges.reduce((acc, seedRange) => {
-    let overlappingRanges = [seedRange];
-    let nextMapName = "seed";
-    while (nextMapName !== "location") {
-      const amountBefore = overlappingRanges.reduce(
+    let currentRange = [seedRange];
+    let currMap = "seed";
+    while (currMap !== "location") {
+      const amountBefore = currentRange.reduce(
         (acc, range) => acc + range.len,
         0,
       );
 
-      const map = maps.get(nextMapName);
+      const map = maps.get(currMap);
       if (!map) {
-        throw new Error(`Could not find map for ${nextMapName}`);
+        throw new Error(`Could not find map for ${currMap}`);
       }
       const ranges = map.ranges;
 
-      const newPositions = [];
+      const newRanges = [];
       let overlap;
       let rangeIndex = 0;
-      while ((overlap = overlappingRanges.shift())) {
-        // console.log();
-        // console.log("overlap:", JSON.stringify(overlap));
-
+      while ((overlap = currentRange.shift())) {
         if (rangeIndex === ranges.length) {
-          newPositions.push(overlap);
+          newRanges.push(overlap);
           continue;
         }
 
-        const range = ranges[rangeIndex]!;
+        const range = ranges[rangeIndex];
+        assert(range);
 
-        const before = {
-          from: overlap.from,
-          len: Math.max(0, Math.min(range.from - overlap.from, overlap.len)),
-        };
-
-        const intersectionFrom = Math.max(overlap.from, range.from);
-        const intersection = {
-          from: intersectionFrom,
-          len: Math.max(
-            0,
-            Math.min(overlap.from + overlap.len, range.from + range.len) -
-              intersectionFrom,
-          ),
-        };
-        const after = {
-          from: intersection.from + intersection.len,
-          len: Math.max(0, overlap.len - before.len - intersection.len),
-        };
-
-        // console.log();
-        // console.log(map.to, JSON.stringify(range));
-        // console.log("before", JSON.stringify(before));
-        // console.log("intersection", JSON.stringify(intersection));
-        // console.log("after", JSON.stringify(after));
+        const beforeLen = Math.max(
+          0,
+          Math.min(range.from - overlap.from, overlap.len),
+        );
+        const intersectionStart = Math.max(overlap.from, range.from);
+        const intersectionLen = Math.max(
+          0,
+          Math.min(overlap.from + overlap.len, range.from + range.len) -
+            intersectionStart,
+        );
+        const afterLen = Math.max(0, overlap.len - beforeLen - intersectionLen);
 
         assert(
-          before.len + intersection.len + after.len === overlap.len,
+          beforeLen + intersectionLen + afterLen === overlap.len,
           "Something went wrong",
         );
 
-        if (before.len > 0) {
-          newPositions.push(before);
-        }
-
-        if (intersection.len > 0) {
-          newPositions.push({
-            from: moveToNewPosition(range, intersection.from),
-            len: intersection.len,
+        if (beforeLen > 0) {
+          newRanges.push({
+            from: overlap.from,
+            len: beforeLen,
           });
         }
 
-        if (after.len > 0) {
-          rangeIndex++;
+        if (intersectionLen > 0) {
+          newRanges.push({
+            from: moveToNewPosition(range, intersectionStart),
+            len: intersectionLen,
+          });
+        }
 
-          if (rangeIndex === ranges.length) {
-            newPositions.push(after);
-          } else {
-            overlappingRanges.unshift(after);
-          }
+        if (afterLen > 0) {
+          const after = {
+            from: intersectionStart + intersectionLen,
+            len: afterLen,
+          };
+
+          currentRange.unshift(after);
+          rangeIndex++;
         }
       }
 
       assert(
-        newPositions.reduce((acc, range) => acc + range.len, 0) ===
-          amountBefore,
+        newRanges.reduce((acc, range) => acc + range.len, 0) === amountBefore,
         "New positions should have the same amount of numbers as before",
       );
 
-      overlappingRanges = newPositions.sort((a, b) => a.from - b.from);
-      nextMapName = map.to;
+      currentRange = newRanges.sort((a, b) => a.from - b.from);
+      currMap = map.to;
     }
 
-    return Math.min(acc, overlappingRanges[0]?.from!);
+    return Math.min(acc, currentRange[0]?.from!);
   }, Infinity);
 
   return min;
@@ -352,3 +345,4 @@ async function main2() {
 
 // 26829166
 console.log(`The lowest location number is ${await main2()}`);
+assert((await main2()) === 26829166);
