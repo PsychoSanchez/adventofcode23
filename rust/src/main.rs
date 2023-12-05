@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 pub mod constants;
 
 use std::{collections::HashMap, io::BufRead};
@@ -111,7 +109,7 @@ fn get_iterator_of_positions_around(
     let to_col_index: usize = std::cmp::min(col_end + 1, symbols[row].len() - 1);
 
     (from_col_index..=to_col_index)
-        .map(move |col_index| {
+        .flat_map(move |col_index| {
             // top and bottom
             let row_above = if row > 0 { row - 1 } else { usize::MAX };
             [row_above, row + 1]
@@ -119,7 +117,6 @@ fn get_iterator_of_positions_around(
                 .filter(move |row_index| is_in_bounds(symbols, *row_index, col_index))
                 .map(move |row_index| [row_index, col_index])
         })
-        .flatten()
         // left and right
         .merge([[row, from_col_index], [row, to_col_index]])
 }
