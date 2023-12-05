@@ -182,7 +182,7 @@ function processInput(input: string) {
   };
 }
 
-function findDestination(
+function findDestinationPosition(
   ranges: Array<{ from: number; to: number; len: number }>,
   num: number,
 ): number {
@@ -194,10 +194,10 @@ function findDestination(
     return num;
   }
 
-  return moveToNewPosition(range, num);
+  return getPositionInRange(range, num);
 }
 
-function moveToNewPosition(
+function getPositionInRange(
   range: { from: number; to: number; len: number },
   num: number,
 ): number {
@@ -210,20 +210,20 @@ async function main1() {
   const { maps, seeds } = processInput(input);
 
   const min = seeds.reduce((acc, seed) => {
-    let prevPosition = seed;
-    let nextMapName = "seed";
-    while (nextMapName !== "location") {
-      const map = maps.get(nextMapName);
+    let curPosition = seed;
+    let curMap = "seed";
+    while (curMap !== "location") {
+      const map = maps.get(curMap);
       if (!map) {
-        throw new Error(`Could not find map for ${nextMapName}`);
+        throw new Error(`Could not find map for ${curMap}`);
       }
 
       const { to, ranges } = map;
-      prevPosition = findDestination(ranges, prevPosition);
-      nextMapName = to;
+      curPosition = findDestinationPosition(ranges, curPosition);
+      curMap = to;
     }
 
-    return Math.min(acc, prevPosition);
+    return Math.min(acc, curPosition);
   }, Infinity);
 
   return min;
@@ -312,7 +312,7 @@ async function main2() {
 
         if (intersectionLen > 0) {
           newRanges.push({
-            from: moveToNewPosition(range, intersectionStart),
+            from: getPositionInRange(range, intersectionStart),
             len: intersectionLen,
           });
         }
