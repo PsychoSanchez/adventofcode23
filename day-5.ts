@@ -247,6 +247,42 @@ assert((await main1()) === 278755257);
 
 // Consider all of the initial seed numbers listed in the ranges on the first line of the almanac. What is the lowest location number that corresponds to any of the initial seed numbers?
 
+interface Range {
+  from: number;
+  len: number;
+}
+
+function getRangesIntersection(range: Range, intersectWithRange: Range) {
+  const outsideLeftLength = Math.max(
+    0,
+    Math.min(intersectWithRange.from - range.from, range.len),
+  );
+  const intersectionStart = Math.max(range.from, intersectWithRange.from);
+  const intersectionLength = Math.max(
+    0,
+    Math.min(
+      range.from + range.len,
+      intersectWithRange.from + intersectWithRange.len,
+    ) - intersectionStart,
+  );
+  const outsideRightLength = Math.max(
+    0,
+    range.len - outsideLeftLength - intersectionLength,
+  );
+
+  assert(
+    outsideLeftLength + intersectionLength + outsideRightLength === range.len,
+    "The sum of all lengths should be equal to the range length",
+  );
+
+  return {
+    outsideLeftLength,
+    outsideRightLength,
+    intersectionStart,
+    intersectionLength,
+  };
+}
+
 async function main2() {
   //   const input = TEST_DATA;
   const input = await openDataFile();
@@ -260,10 +296,11 @@ async function main2() {
   });
 
   const min = seedRanges.reduce((acc, seedRange) => {
-    let currentRange = [seedRange];
+    let rangeProcessQueue = [seedRange];
     let currMap = "seed";
+
     while (currMap !== "location") {
-      const amountBefore = currentRange.reduce(
+      const rangeLengthBefore = rangeProcessQueue.reduce(
         (acc, range) => acc + range.len,
         0,
       );
@@ -275,69 +312,61 @@ async function main2() {
       const ranges = map.ranges;
 
       const newRanges = [];
-      let overlap;
       let rangeIndex = 0;
-      while ((overlap = currentRange.shift())) {
+      let currentRange;
+      while ((currentRange = rangeProcessQueue.shift())) {
         if (rangeIndex === ranges.length) {
-          newRanges.push(overlap);
+          newRanges.push(currentRange);
           continue;
         }
 
         const range = ranges[rangeIndex];
         assert(range);
 
-        const beforeLen = Math.max(
-          0,
-          Math.min(range.from - overlap.from, overlap.len),
-        );
-        const intersectionStart = Math.max(overlap.from, range.from);
-        const intersectionLen = Math.max(
-          0,
-          Math.min(overlap.from + overlap.len, range.from + range.len) -
-            intersectionStart,
-        );
-        const afterLen = Math.max(0, overlap.len - beforeLen - intersectionLen);
+        const {
+          outsideLeftLength,
+          intersectionLength,
+          outsideRightLength,
+          intersectionStart,
+        } = getRangesIntersection(currentRange, range);
 
-        assert(
-          beforeLen + intersectionLen + afterLen === overlap.len,
-          "Something went wrong",
-        );
-
-        if (beforeLen > 0) {
+        if (outsideLeftLength) {
           newRanges.push({
-            from: overlap.from,
-            len: beforeLen,
+            from: currentRange.from,
+            len: outsideLeftLength,
           });
         }
 
-        if (intersectionLen > 0) {
+        if (intersectionLength) {
           newRanges.push({
             from: getPositionInRange(range, intersectionStart),
-            len: intersectionLen,
+            len: intersectionLength,
           });
         }
 
-        if (afterLen > 0) {
+        // If there is a range after the intersection (current is full intersected), add it to the queue and compare with the next range
+        if (outsideRightLength) {
           const after = {
-            from: intersectionStart + intersectionLen,
-            len: afterLen,
+            from: intersectionStart + intersectionLength,
+            len: outsideRightLength,
           };
 
-          currentRange.unshift(after);
+          rangeProcessQueue.unshift(after);
           rangeIndex++;
         }
       }
 
       assert(
-        newRanges.reduce((acc, range) => acc + range.len, 0) === amountBefore,
+        newRanges.reduce((acc, range) => acc + range.len, 0) ===
+          rangeLengthBefore,
         "New positions should have the same amount of numbers as before",
       );
 
-      currentRange = newRanges.sort((a, b) => a.from - b.from);
+      rangeProcessQueue = newRanges.sort((a, b) => a.from - b.from);
       currMap = map.to;
     }
 
-    return Math.min(acc, currentRange[0]?.from!);
+    return Math.min(acc, rangeProcessQueue[0]?.from!);
   }, Infinity);
 
   return min;
