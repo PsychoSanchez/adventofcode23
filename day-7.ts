@@ -214,38 +214,21 @@ const compareRankWithJokerAsc = (a: string, b: string): number => {
 
 function getHandTypeWithJoker(hand: Hand): HandType {
   const cardsWithoutJoker = hand.cards.filter((card) => card !== "J");
-  const jokerCount = hand.cards.length - cardsWithoutJoker.length;
-  // All Jokers
-  if (cardsWithoutJoker.length < 2) {
+  if (cardsWithoutJoker.length === 0) {
     return HandType.FiveOfAKind;
   }
-  // No Jokers
-  if (cardsWithoutJoker.length === 5) {
-    return getHandType(hand);
-  }
 
-  // 2-4 cards and 1-3 jokers
-  const counts = groupCards({ ...hand, cards: cardsWithoutJoker });
-  const uniqueCards = Object.keys(counts);
-  const [firstCardCount, secondCardCount] = uniqueCards
-    .map((card) => counts[card]!)
-    .toSorted((a, b) => b - a);
+  const [[topCard]] = Object.entries(
+    groupCards({ ...hand, cards: cardsWithoutJoker }),
+  ).sort(([_1, countA], [_, countB]) => countB - countA) as [[string, number]];
 
-  assert(firstCardCount !== undefined);
-  const isTwoPair = uniqueCards.length === 2 && secondCardCount === 2;
-  if (isTwoPair) {
-    return HandType.FullHouse;
-  }
-
-  const bestHand = [
-    HandType.OnePair,
-    HandType.ThreeOfAKind,
-    HandType.FourOfAKind,
-    HandType.FiveOfAKind,
-  ][firstCardCount - 1 + jokerCount - 1];
-  assert(bestHand !== undefined);
-
-  return bestHand;
+  return getHandType({
+    ...hand,
+    cards: [
+      ...cardsWithoutJoker,
+      ...Array.from({ length: 5 - cardsWithoutJoker.length }, () => topCard),
+    ],
+  });
 }
 
 async function main2() {
