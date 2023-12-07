@@ -214,138 +214,47 @@ const compareRankWithJokerAsc = (a: string, b: string): number => {
 
 function getHandTypeWithJoker(hand: Hand): HandType {
   const cardsWithoutJoker = hand.cards.filter((card) => card !== "J");
-  if (cardsWithoutJoker.length === 0) {
+  const jokerCount = hand.cards.length - cardsWithoutJoker.length;
+  // All Jokers
+  if (cardsWithoutJoker.length < 2) {
     return HandType.FiveOfAKind;
   }
+  // No Jokers
+  if (cardsWithoutJoker.length === 5) {
+    return getHandType(hand);
+  }
 
+  // 2-4 cards and 1-3 jokers
   const counts = groupCards({ ...hand, cards: cardsWithoutJoker });
-
-  let handTypeWithoutJoker = HandType.HighCard;
-
   const uniqueCards = Object.keys(counts);
-  const [firstCard, secondCard] = uniqueCards
+  const [firstCardCount, secondCardCount] = uniqueCards
     .map((card) => counts[card]!)
     .toSorted((a, b) => b - a);
 
-  assert(firstCard !== undefined);
-  assert(firstCard >= (secondCard || 0));
-
-  if (uniqueCards.length === 1) {
-    handTypeWithoutJoker = [
-      HandType.HighCard,
-      HandType.OnePair,
-      HandType.ThreeOfAKind,
-      HandType.FourOfAKind,
-      HandType.FiveOfAKind,
-    ][cardsWithoutJoker.length - 1]!;
-  } else if (uniqueCards.length === 2) {
-    if (firstCard === 5) {
-      handTypeWithoutJoker = HandType.FiveOfAKind;
-    } else if (firstCard === 4) {
-      handTypeWithoutJoker = HandType.FourOfAKind;
-    } else if (firstCard === 3) {
-      handTypeWithoutJoker =
-        secondCard === 2 ? HandType.FullHouse : HandType.ThreeOfAKind;
-    } else if (firstCard === 2) {
-      handTypeWithoutJoker =
-        secondCard === 2 ? HandType.TwoPair : HandType.OnePair;
-    }
-  } else if (uniqueCards.length === 3) {
-    if (firstCard === 3) {
-      handTypeWithoutJoker = HandType.ThreeOfAKind;
-    } else if (firstCard === 2) {
-      handTypeWithoutJoker =
-        secondCard === 2 ? HandType.TwoPair : HandType.OnePair;
-    }
-  } else if (uniqueCards.length === 4) {
-    handTypeWithoutJoker =
-      firstCard === 2 ? HandType.OnePair : HandType.HighCard;
-  }
-
-  const amountOjJokers = 5 - cardsWithoutJoker.length;
-  if (amountOjJokers === 0) {
-    return handTypeWithoutJoker;
-  }
-
-  if (handTypeWithoutJoker === HandType.HighCard) {
-    const newType = [
-      HandType.OnePair,
-      HandType.ThreeOfAKind,
-      HandType.FourOfAKind,
-      HandType.FiveOfAKind,
-    ][amountOjJokers - 1];
-
-    assert(newType);
-    return newType;
-  }
-
-  if (handTypeWithoutJoker === HandType.OnePair) {
-    const newType = [
-      HandType.ThreeOfAKind,
-      HandType.FourOfAKind,
-      HandType.FiveOfAKind,
-    ][amountOjJokers - 1];
-
-    assert(newType);
-    return newType;
-  }
-
-  if (handTypeWithoutJoker === HandType.TwoPair) {
+  assert(firstCardCount !== undefined);
+  const isTwoPair = uniqueCards.length === 2 && secondCardCount === 2;
+  if (isTwoPair) {
     return HandType.FullHouse;
   }
 
-  if (handTypeWithoutJoker === HandType.ThreeOfAKind) {
-    if (amountOjJokers === 1) {
-      return HandType.FourOfAKind;
-    }
+  const bestHand = [
+    HandType.OnePair,
+    HandType.ThreeOfAKind,
+    HandType.FourOfAKind,
+    HandType.FiveOfAKind,
+  ][firstCardCount - 1 + jokerCount - 1];
+  assert(bestHand !== undefined);
 
-    return HandType.FiveOfAKind;
-  }
-  if (handTypeWithoutJoker === HandType.FourOfAKind) {
-    return HandType.FiveOfAKind;
-  }
-
-  return handTypeWithoutJoker;
+  return bestHand;
 }
 
 async function main2() {
   //   const input = processInput(TEST_DATA);
   const input = processInput(await getFileData());
-  //   const input = processInput(`AAAAA 2
-  // 22222 3
-  // AAAAK 5
-  // 22223 7
-  // AAAKK 11
-  // 22233 13
-  // AAAKQ 17
-  // 22234 19
-  // AAKKQ 23
-  // 22334 29
-  // AAKQJ 31
-  // 22345 37
-  // AKQJT 41
-  // 23456 43`);
-
-  // AAAAA
-  // 22222
-  // AAAAK
-  // 22223
-  // AAAKK
-  // 22233
-  // AAAKQ
-  // AAKQJ
-  // 22234
-  // AAKKQ
-  // 22334
-  // AKQJT
-  // 22345
-  // 23456
 
   const handsByType: Hand[][] = input
     .reduce(
       (acc: Hand[][], hand) => {
-        // const originalHandType = getHandType(hand);
-        // const amountOjJokers = hand.cards.filter((card) => card === "J").length;
         const bumpedHandType = getHandTypeWithJoker(hand);
         acc[bumpedHandType] ??= [];
 
@@ -388,3 +297,4 @@ async function main2() {
 const r2 = await main2();
 console.log(`Result: ${r2}`);
 // assert.equal(r2, 5905);
+assert.equal(r2, 249776650);
