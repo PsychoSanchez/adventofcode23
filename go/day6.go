@@ -116,5 +116,4 @@ func main() {
 	time, distance := processInput2(input)
 	bestTime := getAmountOfWinningOptions(time, distance)
 	fmt.Printf("Part2: Winning options for is %d\n", bestTime)
-
 }
