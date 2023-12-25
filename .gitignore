@@ -176,3 +176,5 @@ dist
 
 .history
 /rust/target
+.vscode
+.metals
