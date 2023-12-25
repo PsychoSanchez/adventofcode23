@@ -101,54 +101,52 @@ def part1(input: String): Int =
 
   puzzles.map(findSumForMirrorPoints).sum
 
-def findSumForMirrorPointsWithCorrection(input: String): Int =
+def findSumForMirrorPointsWithExactlyOneCorrection(input: String): Int =
   var lines = input.split("\n").toArray
   var rowCount = lines.length
   var columnCount = lines(0).length
 
+  var countRowCharDiff = (indexPair: (Int, Int)) => {
+    (0 to columnCount - 1)
+      .filter((colIndex) =>
+        lines(indexPair._1)(colIndex) != lines(indexPair._2)(colIndex)
+      )
+      .size
+  }
   var rowMirrorPoint = getPivotPointCompareIndexes(rowCount)
     .indexWhere((indexes) =>
       indexes
-        .map((indexPair) =>
-          (lines(indexPair._1).toCharArray(), lines(indexPair._2).toCharArray())
-        )
-        .map((lines) =>
-          (0 to lines._1.length - 1)
-            .filter((i) => lines._1(i) != lines._2(i))
-            .size
-        )
+        .map(countRowCharDiff)
         .sum == 1
     )
 
   var colMirrorPoint =
     if (rowMirrorPoint > -1) then -1
-    else
+    else {
+      var countColumnCharDiff = (indexPair: (Int, Int)) => {
+        (0 to rowCount - 1)
+          .filter((rowIndex) =>
+            lines(rowIndex)(indexPair._1) != lines(rowIndex)(
+              indexPair._2
+            )
+          )
+          .size
+      }
+
       getPivotPointCompareIndexes(columnCount)
         .indexWhere((indexes) =>
           indexes
-            .map(indexPair => {
-              var (firstColumnIndex, secondColumnIndex) = indexPair
-
-              (0 to rowCount - 1)
-                .filter((rowIndex) =>
-                  lines(rowIndex)(firstColumnIndex) != lines(rowIndex)(
-                    secondColumnIndex
-                  )
-                )
-                .size
-            })
+            .map(countColumnCharDiff)
             .sum == 1
         )
+    }
 
-  println(
-    s"(rowMirrorPoint, colMirrorPoint): (${rowMirrorPoint}, ${colMirrorPoint}))"
-  )
   (rowMirrorPoint + 1) * 100 + colMirrorPoint + 1
 
 def part2(input: String): Int =
   var lines = input.split("\n\n").toArray
 
-  lines.map(findSumForMirrorPointsWithCorrection).sum
+  lines.map(findSumForMirrorPointsWithExactlyOneCorrection).sum
 
 // read file
 def readFile(filename: String): String =
